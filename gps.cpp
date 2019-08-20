@@ -1,4 +1,5 @@
 #include "gps.h"
+#define GPSDEBUG 1
 
 HardwareSerial GPSSerial(1);
 
@@ -19,22 +20,28 @@ void gps::encode()
         {
             char data = GPSSerial.read();
             tGps.encode(data);
-            //Serial.print(data);
+            #ifdef GPSDEBUG
+              Serial.print(data);
+            #endif
         }
     }
-     //Serial.println("");
+    #ifdef GPSDEBUG
+     Serial.println("");
+    #endif
 }
 
 void gps::buildPacket(uint8_t txBuffer[9])
 {
   LatitudeBinary = ((tGps.location.lat() + 90) / 180.0) * 16777215;
   LongitudeBinary = ((tGps.location.lng() + 180) / 360.0) * 16777215;
-  
-  sprintf(t, "Lat: %f", tGps.location.lat());
-  Serial.println(t);
-  
-  sprintf(t, "Lng: %f", tGps.location.lng());
-  Serial.println(t);
+
+  #ifdef GPSDEBUG
+    sprintf(t, "Lat: %f", tGps.location.lat());
+    Serial.println(t);
+    
+    sprintf(t, "Lng: %f", tGps.location.lng());
+    Serial.println(t);
+  #endif
   
   txBuffer[0] = ( LatitudeBinary >> 16 ) & 0xFF;
   txBuffer[1] = ( LatitudeBinary >> 8 ) & 0xFF;
@@ -50,6 +57,63 @@ void gps::buildPacket(uint8_t txBuffer[9])
 
   hdopGps = tGps.hdop.value()/10;
   txBuffer[8] = hdopGps & 0xFF;
+}
+
+void gps::softwareReset() {
+  GPSSerial.write(CFG_RST, sizeof(CFG_RST));
+}
+
+void gps::wakeup(){
+  Serial.println("Wake");
+  int data = -1;
+  do{
+    for(int i = 0; i < 20; i++){ //send random to trigger respose
+        GPSSerial.write(0xFF);
+      }
+    data = GPSSerial.read();
+  }while(data == -1);
+  Serial.println("not sleeping");
+
+}
+
+void gps::enableSleep()
+{
+  do{ //We cannot read UBX ack therefore try to sleep gps until it does not send data anymore
+    #ifdef GPSDEBUG
+      Serial.println("try to sleep gps!");
+    #endif
+    gps::softwareReset(); //sleep_mode can only be activated at start up
+    delay(600); //give some time to restart //TODO wait for ack
+    GPSSerial.write(RXM_PMREQ, sizeof(RXM_PMREQ));
+    unsigned long startTime = millis();
+    unsigned long offTime = 1;
+    Serial.println(offTime);
+    
+    while(millis() - startTime < 1000){ //wait for the last command to finish
+      int c = GPSSerial.read();
+      if(offTime == 1 && c == -1){ //check  if empty
+        offTime = millis();
+      }else if(c != -1){
+        offTime = 1;
+      }
+      if(offTime != 1 && millis() - offTime > 100){ //if gps chip does not send any commands for .. seconds it is sleeping
+        Serial.println("sleeping gps!");
+        return;
+      }
+    }
+  }while(1);
+}
+
+void gps::setLowPower()
+{
+    #ifdef GPSDEBUG
+      Serial.println("try to set gps to low power mode");
+    #endif
+    gps::softwareReset(); //sleep_mode can only be activated at start up
+    delay(600); //give some time to restart //TODO wait for ack
+    GPSSerial.write(GPSpowersave, sizeof(GPSpowersave));
+    delay(1000);
+    
 }
 
 bool gps::checkGpsFix()
@@ -86,4 +150,14 @@ bool gps::checkGpsFix()
 
     return false;
   }
+}
+
+double gps::lat() 
+{
+  return tGps.location.lat();  
+}
+
+double gps::lng() 
+{
+  return tGps.location.lng();  
 }

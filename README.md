@@ -4,7 +4,7 @@ This is a simple sketch demonstrating the capability of the [TTGO T-Beam](https:
 
 Derived from [sbiermann/Lora-TTNMapper-ESP32](https://github.com/sbiermann/Lora-TTNMapper-ESP32) and with some information/inspiration from [cyberman54/ESP32-Paxcounter](https://github.com/cyberman54/ESP32-Paxcounter) and [Edzelf/LoRa](https://github.com/Edzelf/LoRa).
 
-Modified and enhanced by dermatthias with sleep and OTAA features for this fork.
+Modified and enhanced by dermatthias with sleep and OTAA features for this fork. Additional sleepytimes for the GPS module enabling lower-power-ish operations by stk, based on work by [JoepSchyns/Low_power_TTGO_T-Beam](https://github.com/JoepSchyns/Low_power_TTGO_T-beam) and helpful [ublox documentation in the UKHAS Wiki](https://ukhas.org.uk/guides:ublox_psm). This also measures and transmits battery voltage.
 
 ## Software dependencies
 
@@ -12,11 +12,11 @@ Arduino IDE [ESP32 extension](https://github.com/espressif/arduino-esp32)
 
 [TinyGPS++](http://arduiniana.org/libraries/tinygpsplus/)
 
-[LMIC-Arduino](https://github.com/matthijskooijman/arduino-lmic) : Make sure to get the last version - *1.5.0+arduino-2* currently - because the arduino IDE library updater is getting confused by the versioning scheme of that library.
+[MCCI LMIC Arduino](https://github.com/mcci-catena/arduino-lmic) This is a hell to configure. You need to edit `~/Arduino/libraries/MCCI_LoRaWAN_LMIC_library/project_config/lmic_project_config.h` and define the “right” band, e.g. `CFG_eu868` (and comment out non-matching others)
 
 ## Instructions
 
-You need to connect the [T-Beam](https://github.com/LilyGO/TTGO-T-Beam) DIO1 pin marked *Lora1* to the *pin 33* - So that the ESP32 can read that output from the Lora module.
+_If you have an older hardware version:_ You need to connect the [T-Beam](https://github.com/LilyGO/TTGO-T-Beam) DIO1 pin marked *Lora1* to the *pin 33* - So that the ESP32 can read that output from the Lora module.
 Optionally you can also connect the *Lora2* output to *GPIO 32*, but this is not needed here.
 
 You can program the T-Beam using the [Arduino ESP32](https://github.com/espressif/arduino-esp32) board 'Heltec_WIFI_LoRa_32'.
@@ -47,6 +47,8 @@ function Decoder(bytes, port) {
   
     decoded.hdop = bytes[8] / 10.0;
 
+    decoded.vbat = ((bytes[9]<<8) + bytes[10]) / 100;
+
     return decoded;
 }
 ```
@@ -61,7 +63,7 @@ Let me know if more detailed instructions are needed.
 * ~~Save and reload the frame counter somewhere - GPS RTC data ? SPIFFS ? EEPROM ? - so I can check the "Frame Counter Checks" box as recommended on TTN~~.
 * Also save the GPS 'status' so that on next boot it gets a fix faster.
 * ~~Reduce the power needed ! That thing is a power hog currently, we need to make it sleep most of the time as possible~~.
-* Adapt the data send frequency based on current velocity : When not moving, an update per hour should be enough.
+* Adapt the data send frequency based on current velocity : When not moving, an update per hour should be enough. ← this will be a future step including cheap accelerometers.
 
 Let me know if you think anything else would make sense for a TTN mapper node : Open an issue, I will consider it.
 
